@@ -1,6 +1,6 @@
-from typing import Literal
+from typing import Literal, Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, Request, UploadFile
+from fastapi import APIRouter, Depends, HTTPException, Request, UploadFile, File, Form
 from pydantic import BaseModel
 
 from private_gpt.server.ingest.ingest_service import IngestedDoc, IngestService
@@ -20,7 +20,11 @@ class IngestResponse(BaseModel):
     "/ingest", tags=["Ingestion"], dependencies=[Depends(authenticated)]
 )
 def ingest(
-    request: Request, file: UploadFile, user: User = Depends(authenticated)
+    request: Request,
+    file: Annotated[UploadFile, File],
+    url: Annotated[str, Form()],
+    item_id: Annotated[str, Form()],
+    user: User = Depends(authenticated),
 ) -> IngestResponse:
     """Ingests and processes a file, storing its chunks to be used as context.
 
@@ -43,7 +47,9 @@ def ingest(
     service = request.state.injector.get(IngestService)
     if file.filename is None:
         raise HTTPException(400, "No file name provided")
-    ingested_documents = service.ingest(file.filename, file.file.read())
+    ingested_documents = service.ingest(
+        file.filename, file.file.read(), user_id=user.sub, url=url, item_id=item_id
+    )
     return IngestResponse(object="list", model="private-gpt", data=ingested_documents)
 
 

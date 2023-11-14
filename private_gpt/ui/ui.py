@@ -14,6 +14,7 @@ from pydantic import BaseModel
 
 from private_gpt.constants import PROJECT_ROOT_PATH
 from private_gpt.di import global_injector
+from private_gpt.open_ai.extensions.context_filter import ContextFilter
 from private_gpt.server.chat.chat_service import ChatService, CompletionGen
 from private_gpt.server.chunks.chunks_service import Chunk, ChunksService
 from private_gpt.server.ingest.ingest_service import IngestService
@@ -35,6 +36,7 @@ class Source(BaseModel):
     file: str
     page: str
     text: str
+    user_id: str
 
     class Config:
         frozen = True
@@ -46,10 +48,10 @@ class Source(BaseModel):
         for chunk in sources:
             doc_metadata = chunk.document.doc_metadata
 
-            file_name = doc_metadata.get("file_name", "-") if doc_metadata else "-"
             page_label = doc_metadata.get("page_label", "-") if doc_metadata else "-"
-
-            source = Source(file=file_name, page=page_label, text=chunk.text)
+            user_id = doc_metadata.get("user_id", "-") if doc_metadata else "-"
+            url = doc_metadata.get("url", "-") if doc_metadata else "-"
+            source = Source(file=url, page=page_label, text=chunk.text, user_id=user_id)
             curated_sources.add(source)
 
         return curated_sources
@@ -71,7 +73,9 @@ class PrivateGptUi:
         # Cache the UI blocks
         self._ui_block = None
 
-    def _chat(self, message: str, history: list[list[str]], mode: str, *_: Any) -> Any:
+    def _chat(
+        self, message: str, history: list[list[str]], mode: str, user_id: str, *_: Any
+    ) -> Any:
         def yield_deltas(completion_gen: CompletionGen) -> Iterable[str]:
             full_response: str = ""
             stream = completion_gen.response
@@ -119,19 +123,16 @@ class PrivateGptUi:
                 query_stream = self._chat_service.stream_chat(
                     messages=all_messages,
                     use_context=True,
+                    context_filter=ContextFilter(user_id=user_id),
                 )
                 yield from yield_deltas(query_stream)
 
-            case "LLM Chat":
-                llm_stream = self._chat_service.stream_chat(
-                    messages=all_messages,
-                    use_context=False,
-                )
-                yield from yield_deltas(llm_stream)
-
             case "Search in Docs":
                 response = self._chunks_service.retrieve_relevant(
-                    text=message, limit=4, prev_next_chunks=0
+                    text=message,
+                    limit=4,
+                    prev_next_chunks=0,
+                    context_filter=ContextFilter(user_id=user_id),
                 )
 
                 sources = Source.curate_sources(response)
@@ -149,18 +150,10 @@ class PrivateGptUi:
             if ingested_document.doc_metadata is None:
                 # Skipping documents without metadata
                 continue
-            file_name = ingested_document.doc_metadata.get(
-                "file_name", "[FILE NAME MISSING]"
-            )
-            files.add(file_name)
+            url = ingested_document.doc_metadata.get("url", "url_missing")
+            user_id = ingested_document.doc_metadata.get("user_id", "no user id")
+            files.add(f"{url} - userId: {user_id}")
         return [[row] for row in files]
-
-    def _upload_file(self, files: list[str]) -> None:
-        logger.debug("Loading count=%s files", len(files))
-        for file in files:
-            logger.info("Loading file=%s", file)
-            path = Path(file)
-            self._ingest_service.ingest(file_name=path.name, file_data=path)
 
     def _build_ui_blocks(self) -> gr.Blocks:
         logger.debug("Creating the UI blocks")
@@ -184,15 +177,13 @@ class PrivateGptUi:
             with gr.Row():
                 with gr.Column(scale=3, variant="compact"):
                     mode = gr.Radio(
-                        ["Query Docs", "Search in Docs", "LLM Chat"],
+                        ["Query Docs", "Search in Docs"],
                         label="Mode",
                         value="Query Docs",
                     )
-                    upload_button = gr.components.UploadButton(
-                        "Upload File(s)",
-                        type="filepath",
-                        file_count="multiple",
-                        size="sm",
+                    user_id = gr.Text(
+                        label="User Id",
+                        value="12",
                     )
                     ingested_dataset = gr.List(
                         self._list_ingested_files,
@@ -200,11 +191,6 @@ class PrivateGptUi:
                         label="Ingested Files",
                         interactive=False,
                         render=False,  # Rendered under the button
-                    )
-                    upload_button.upload(
-                        self._upload_file,
-                        inputs=upload_button,
-                        outputs=ingested_dataset,
                     )
                     ingested_dataset.change(
                         self._list_ingested_files,
@@ -223,7 +209,7 @@ class PrivateGptUi:
                                 AVATAR_BOT,
                             ),
                         ),
-                        additional_inputs=[mode, upload_button],
+                        additional_inputs=[mode, user_id],
                     )
         return blocks
 

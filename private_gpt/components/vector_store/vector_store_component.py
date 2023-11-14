@@ -33,6 +33,17 @@ def _chromadb_doc_id_metadata_filter(
         return doc_filter
 
 
+@typing.no_type_check
+def _chromadb_user_id_metadata_filter(
+    context_filter: ContextFilter | None,
+) -> dict | None:
+    if context_filter is None or context_filter.user_id is None:
+        raise Exception("Need a user id")
+    else:
+        user_filter = {"user_id": context_filter.user_id}
+    return user_filter
+
+
 @singleton
 class VectorStoreComponent:
     vector_store: VectorStore
@@ -109,7 +120,7 @@ class VectorStoreComponent:
             similarity_top_k=similarity_top_k,
             doc_ids=context_filter.docs_ids if context_filter else None,
             vector_store_kwargs={
-                "where": _chromadb_doc_id_metadata_filter(context_filter)
+                "where": _chromadb_user_id_metadata_filter(context_filter)
             },
         )
 
