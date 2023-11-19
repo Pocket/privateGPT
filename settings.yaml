@@ -6,7 +6,7 @@ server:
     allow_origins: ["*"]
     allow_methods: ["*"]
     allow_headers: ["*"]
-  auth:
+  basic_auth:
     enabled: false
     # python -c 'import base64; print("Basic " + base64.b64encode("secret:key".encode()).decode())'
     # 'secret' is the username and 'key' is the password for basic auth by default

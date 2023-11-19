@@ -43,6 +43,12 @@ sentence-transformers = "^2.2.2"
 torch = ">=2.0.0, !=2.0.1, !=2.1.0"
 transformers = "^4.34.0"
 
+[tool.poetry.group.jwt]
+optional = true
+[tool.poetry.group.jwt.dependencies]
+pyjwt = "^2.8.0"
+crypto = "^1.4.1"
+
 [tool.poetry.extras]
 chroma = ["chromadb"]
 
