@@ -15,7 +15,7 @@ class CorsSettings(BaseModel):
 
     enabled: bool = Field(
         description="Flag indicating if CORS headers are set or not."
-                    "If set to True, the CORS headers will be set to allow all origins, methods and headers.",
+        "If set to True, the CORS headers will be set to allow all origins, methods and headers.",
         default=False,
     )
     allow_credentials: bool = Field(
@@ -54,13 +54,13 @@ class BasicAuthSettings(BaseModel):
     )
     secret: str = Field(
         description="The secret to be used for authentication. "
-                    "It can be any non-blank string. For HTTP basic authentication, "
-                    "this value should be the whole 'Authorization' header that is expected"
+        "It can be any non-blank string. For HTTP basic authentication, "
+        "this value should be the whole 'Authorization' header that is expected"
     )
 
 
 class JWTAuthSettings(BaseModel):
-    """Authentication configuration for JWT
+    """Authentication configuration for JWT.
 
     The implementation of the authentication strategy for JWT
     """
@@ -69,12 +69,10 @@ class JWTAuthSettings(BaseModel):
         description="Flag indicating if authentication is enabled or not.",
         default=False,
     )
-    jwks_url: str = Field(
-        description="The url to download JWKs from for verification"
-    )
+    jwks_url: str = Field(description="The url to download JWKs from for verification")
     ingest_claim: str = Field(
         description="The JWT claim to use to determine if allowed to ingest",
-        default="ingest"
+        default="ingest",
     )
 
 
@@ -93,14 +91,16 @@ class ServerSettings(BaseModel):
 
     jwt_auth: JWTAuthSettings = Field(
         description="JWT AUTh configuration",
-        default_factory=lambda: JWTAuthSettings(enabled=False, jwks_url="https://example.com/.well-known/jwks.json"),
+        default_factory=lambda: JWTAuthSettings(
+            enabled=False, jwks_url="https://example.com/.well-known/jwks.json"
+        ),
     )
 
 
 class DataSettings(BaseModel):
     local_data_folder: str = Field(
         description="Path to local storage."
-                    "It will be treated as an absolute path if it starts with /"
+        "It will be treated as an absolute path if it starts with /"
     )
 
 

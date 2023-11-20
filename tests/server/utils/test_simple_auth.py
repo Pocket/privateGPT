@@ -16,16 +16,17 @@ from private_gpt.server.utils.auth import (
     _simple_authentication,
     authenticated,
 )
+from private_gpt.server.utils.user import User
 from private_gpt.settings.settings import settings
 
 
 def _copy_simple_authenticated(
-    _simple_authentication: Annotated[bool, Depends(_simple_authentication)]
-) -> bool:
+    _simple_authentication: Annotated[User, Depends(_simple_authentication)]
+) -> User:
     """Check if the request is authenticated."""
     if not _simple_authentication:
         raise NOT_AUTHENTICATED
-    return True
+    return User(sub="simple_user", allowed_ingest=True)
 
 
 @pytest.fixture(autouse=True)
@@ -51,6 +52,7 @@ def test_default_auth_working_when_enabled_200(test_client: TestClient) -> None:
     assert response_fail.status_code == 401
 
     response_success = test_client.get(
-        "/v1/ingest/list", headers={"Authorization": settings().server.auth.secret}
+        "/v1/ingest/list",
+        headers={"Authorization": settings().server.basic_auth.secret},
     )
     assert response_success.status_code == 200

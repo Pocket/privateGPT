@@ -23,9 +23,9 @@ from typing import Annotated
 
 from fastapi import Depends, Header, HTTPException
 
+from private_gpt.di import global_injector
 from private_gpt.server.utils.user import User
 from private_gpt.settings.settings import settings
-from private_gpt.di import global_injector
 
 # 401 signify that the request requires authentication.
 # 403 signify that the authenticated user is not authorized to perform the operation.
@@ -40,7 +40,7 @@ logger = logging.getLogger(__name__)
 
 def _simple_authentication(authorization: Annotated[str, Header()] = "") -> User:
     """Check if the request is authenticated."""
-    if not secrets.compare_digest(authorization, settings().server.auth.secret):
+    if not secrets.compare_digest(authorization, settings().server.basic_auth.secret):
         # If the "Authorization" header is not the expected one, raise an exception.
         raise NOT_AUTHENTICATED
     return User(sub="basic_user", allowed_ingest=True)
@@ -48,33 +48,38 @@ def _simple_authentication(authorization: Annotated[str, Header()] = "") -> User
 
 def _jwt_authentication(authorization: Annotated[str, Header()] = "") -> User:
     from jwt_auth import JWTAuth
+
     return global_injector.get(JWTAuth).validate_jwt(authorization)
 
 
 if settings().server.jwt_auth.enabled:
     logger.debug("Using JWT based authentication for the request")
 
-    # Method to be used as a dependency to check if the request is authenticated for jwt auth.
+    # Method to be used as a dependency to check if the request
+    # is authenticated for jwt auth.
     def authenticated(
-            _jwt_authentication: Annotated[User | None, Depends(_jwt_authentication)]
+        _jwt_authentication: Annotated[User | None, Depends(_jwt_authentication)]
     ) -> User:
         """Check if the request is authenticated."""
         assert settings().server.jwt_auth.enabled
         if _jwt_authentication is None:
             raise HTTPException(status_code=401, detail="Invalid JWT")
         return _jwt_authentication
+
 elif settings().server.basic_auth.enabled:
     logger.debug("Using basic authentication for the request")
 
-    # Method to be used as a dependency to check if the request is authenticated for basic auth.
+    # Method to be used as a dependency to check if the request
+    # is authenticated for basic auth.
     def authenticated(
-            _simple_authentication: Annotated[User|None, Depends(_simple_authentication)]
+        _simple_authentication: Annotated[User | None, Depends(_simple_authentication)]
     ) -> User:
         """Check if the request is authenticated."""
         assert settings().server.basic_auth.enabled
         if _simple_authentication is None:
             raise NOT_AUTHENTICATED
         return _simple_authentication
+
 else:
     logger.debug(
         "Defining a dummy authentication mechanism for fastapi, always authenticating requests"
