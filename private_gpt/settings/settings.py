@@ -72,6 +72,10 @@ class JWTAuthSettings(BaseModel):
     jwks_url: str = Field(
         description="The url to download JWKs from for verification"
     )
+    ingest_claim: str = Field(
+        description="The JWT claim to use to determine if allowed to ingest",
+        default="ingest"
+    )
 
 
 class ServerSettings(BaseModel):

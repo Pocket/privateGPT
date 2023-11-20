@@ -27,7 +27,7 @@ class JWTAuth:
     def __init__(self):
         self.jwks_client = PyJWKClient(settings().server.jwt_auth.jwksUrl, cache_jwk_set=True)
 
-    def validate_jwt(self, authorization: str) -> User:
+    def validate_jwt(self, authorization: str) -> User|None:
         try:
             token = _parse_token(authorization)
             signing_key = self.jwks_client.get_signing_key_from_jwt(token)
@@ -38,6 +38,6 @@ class JWTAuth:
                 audience="https://expenses-api",
                 options={"require": ["exp", "iss", "sub"], "verify_signature": True}
             )
-            return User(sub=data['sub'])
+            return User(sub=data['sub'], allowed_ingest=bool(data.get(settings().server.jwt_auth.ingest_claim, False)))
         except ():
-            raise HTTPException(401, "Invalid Token")
+            return None

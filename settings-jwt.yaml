@@ -1,0 +1,5 @@
+server:
+  jwt_auth:
+    enabled: ${JWT_AUTH_ENABLED:false}
+    jwks_url: ${JWK_URL:https://example.com/.well-known/jwk}
+    ingest_claim: ${JWT_INGEST_CLAIM:ingest}

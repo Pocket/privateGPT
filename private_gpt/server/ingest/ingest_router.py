@@ -32,6 +32,10 @@ def ingest(request: Request, file: UploadFile) -> IngestResponse:
     can be used to filter the context used to create responses in
     `/chat/completions`, `/completions`, and `/chunks` APIs.
     """
+    user = request.state.injector.get(authenticated)
+    if not user.allowed_ingest:
+        raise HTTPException(401, "Not authorized to ingest content")
+
     service = request.state.injector.get(IngestService)
     if file.filename is None:
         raise HTTPException(400, "No file name provided")
@@ -46,6 +50,10 @@ def list_ingested(request: Request) -> IngestResponse:
     Those IDs can be used to filter the context used to create responses
     in `/chat/completions`, `/completions`, and `/chunks` APIs.
     """
+    user = request.state.injector.get(authenticated)
+    if not user.allowed_ingest:
+        raise HTTPException(401, "Not authorized to list ingested content")
+
     service = request.state.injector.get(IngestService)
     ingested_documents = service.list_ingested()
     return IngestResponse(object="list", model="private-gpt", data=ingested_documents)
@@ -58,5 +66,8 @@ def delete_ingested(request: Request, doc_id: str) -> None:
     The `doc_id` can be obtained from the `GET /ingest/list` endpoint.
     The document will be effectively deleted from your storage context.
     """
+    user = request.state.injector.get(authenticated)
+    if not user.allowed_ingest:
+        raise HTTPException(401, "Not authorized to delete ingested content")
     service = request.state.injector.get(IngestService)
     service.delete(doc_id)

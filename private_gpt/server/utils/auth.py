@@ -43,7 +43,7 @@ def _simple_authentication(authorization: Annotated[str, Header()] = "") -> User
     if not secrets.compare_digest(authorization, settings().server.auth.secret):
         # If the "Authorization" header is not the expected one, raise an exception.
         raise NOT_AUTHENTICATED
-    return User(sub="basic_user")
+    return User(sub="basic_user", allowed_ingest=True)
 
 
 def _jwt_authentication(authorization: Annotated[str, Header()] = "") -> User:
@@ -56,21 +56,24 @@ if settings().server.jwt_auth.enabled:
 
     # Method to be used as a dependency to check if the request is authenticated for jwt auth.
     def authenticated(
-            _jwt_authentication: Annotated[User, Depends(_jwt_authentication)]
+            _jwt_authentication: Annotated[User | None, Depends(_jwt_authentication)]
     ) -> User:
         """Check if the request is authenticated."""
         assert settings().server.jwt_auth.enabled
-
+        if _jwt_authentication is None:
+            raise HTTPException(status_code=401, detail="Invalid JWT")
         return _jwt_authentication
 elif settings().server.basic_auth.enabled:
     logger.debug("Using basic authentication for the request")
 
     # Method to be used as a dependency to check if the request is authenticated for basic auth.
     def authenticated(
-            _simple_authentication: Annotated[User, Depends(_simple_authentication)]
+            _simple_authentication: Annotated[User|None, Depends(_simple_authentication)]
     ) -> User:
         """Check if the request is authenticated."""
         assert settings().server.basic_auth.enabled
+        if _simple_authentication is None:
+            raise NOT_AUTHENTICATED
         return _simple_authentication
 else:
     logger.debug(
@@ -80,4 +83,4 @@ else:
     # Define a dummy authentication method that always returns True.
     def authenticated() -> User:
         """Check if the request is authenticated."""
-        return User(sub="unauthenticated_dummy_user")
+        return User(sub="unauthenticated_dummy_user", allowed_ingest=True)
