@@ -36,9 +36,7 @@ class ChatBody(BaseModel):
                     "stream": False,
                     "use_context": True,
                     "include_sources": True,
-                    "context_filter": {
-                        "docs_ids": ["c202d5e6-7b69-4869-81cc-dd574ee8ee11"]
-                    },
+                    "context_filter": {"user_id": "12"},
                 }
             ]
         }

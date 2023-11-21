@@ -1,0 +1,6 @@
+vectorstore:
+  collection_name: ${COLLECTION_NAME:privateGPT}
+  qdrant:
+    location: ${QDRANT_URL::memory:}
+    https: ${QDRANT_USE_HTTPS:false}
+    prefer_grpc: ${QDRANT_USE_GRPC:false}

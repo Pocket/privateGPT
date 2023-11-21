@@ -1,6 +1,6 @@
-from typing import Literal
+from typing import Annotated, Literal
 
-from fastapi import APIRouter, Depends, HTTPException, Request, UploadFile
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile
 from pydantic import BaseModel
 
 from private_gpt.server.ingest.ingest_service import IngestedDoc, IngestService
@@ -20,7 +20,11 @@ class IngestResponse(BaseModel):
     "/ingest", tags=["Ingestion"], dependencies=[Depends(authenticated)]
 )
 def ingest(
-    request: Request, file: UploadFile, user: User = Depends(authenticated)
+    request: Request,
+    file: Annotated[UploadFile, File],
+    url: Annotated[str, Form()],
+    item_id: Annotated[str, Form()],
+    user: Annotated[User, Depends(authenticated)],
 ) -> IngestResponse:
     """Ingests and processes a file, storing its chunks to be used as context.
 
@@ -43,7 +47,10 @@ def ingest(
     service = request.state.injector.get(IngestService)
     if file.filename is None:
         raise HTTPException(400, "No file name provided")
-    ingested_documents = service.ingest(file.filename, file.file.read())
+    service.delete_item(user_id=user.sub, item_id=item_id)
+    ingested_documents = service.ingest(
+        file.filename, file.file.read(), user_id=user.sub, url=url, item_id=item_id
+    )
     return IngestResponse(object="list", model="private-gpt", data=ingested_documents)
 
 
@@ -51,7 +58,8 @@ def ingest(
     "/ingest/list", tags=["Ingestion"], dependencies=[Depends(authenticated)]
 )
 def list_ingested(
-    request: Request, user: User = Depends(authenticated)
+    request: Request,
+    user: Annotated[User, Depends(authenticated)],
 ) -> IngestResponse:
     """Lists already ingested Documents including their Document ID and metadata.
 
@@ -62,7 +70,7 @@ def list_ingested(
         raise HTTPException(401, "Not authorized to list ingested content")
 
     service = request.state.injector.get(IngestService)
-    ingested_documents = service.list_ingested()
+    ingested_documents = service.list_ingested_user(user_id=user.sub)
     return IngestResponse(object="list", model="private-gpt", data=ingested_documents)
 
 
@@ -70,7 +78,9 @@ def list_ingested(
     "/ingest/{doc_id}", tags=["Ingestion"], dependencies=[Depends(authenticated)]
 )
 def delete_ingested(
-    request: Request, doc_id: str, user: User = Depends(authenticated)
+    request: Request,
+    doc_id: str,
+    user: Annotated[User, Depends(authenticated)],
 ) -> None:
     """Delete the specified ingested Document.
 
@@ -81,3 +91,18 @@ def delete_ingested(
         raise HTTPException(401, "Not authorized to delete ingested content")
     service = request.state.injector.get(IngestService)
     service.delete(doc_id)
+
+
+@ingest_router.delete(
+    "/ingest/item/{item_id}", tags=["Ingestion"], dependencies=[Depends(authenticated)]
+)
+def delete_ingested_item(
+    request: Request,
+    item_id: str,
+    user: Annotated[User, Depends(authenticated)],
+) -> None:
+    """Delete all documents related to the user and itemId."""
+    if not user.allowed_ingest:
+        raise HTTPException(401, "Not authorized to delete ingested content")
+    service = request.state.injector.get(IngestService)
+    service.delete_item(user_id=user.sub, item_id=item_id)

@@ -81,7 +81,14 @@ class IngestService:
             node_parser=SentenceWindowNodeParser.from_defaults(),
         )
 
-    def ingest(self, file_name: str, file_data: AnyStr | Path) -> list[IngestedDoc]:
+    def ingest(
+        self,
+        file_name: str,
+        file_data: AnyStr | Path,
+        user_id: AnyStr | None,
+        url: AnyStr | None,
+        item_id: AnyStr | None,
+    ) -> list[IngestedDoc]:
         logger.info("Ingesting file_name=%s", file_name)
         extension = Path(file_name).suffix
         reader_cls = FILE_READER_CLS.get(extension)
@@ -127,16 +134,29 @@ class IngestService:
             "Transformed file=%s into count=%s documents", file_name, len(documents)
         )
         for document in documents:
-            document.metadata["file_name"] = file_name
+            # document.metadata["file_name"] = file_name
+            if user_id is not None:
+                document.metadata["user_id"] = user_id
+            if url is not None:
+                document.metadata["url"] = url
+            if item_id is not None:
+                document.metadata["item_id"] = item_id
         return self._save_docs(documents)
 
     def _save_docs(self, documents: list[Document]) -> list[IngestedDoc]:
         for document in documents:
             document.metadata["doc_id"] = document.doc_id
             # We don't want the Embeddings search to receive this metadata
-            document.excluded_embed_metadata_keys = ["doc_id"]
+            document.excluded_embed_metadata_keys = ["doc_id", "item_id"]
             # We don't want the LLM to receive these metadata in the context
-            document.excluded_llm_metadata_keys = ["file_name", "doc_id", "page_label"]
+            document.excluded_llm_metadata_keys = [
+                "file_name",
+                "doc_id",
+                "page_label",
+                "user_id",
+                "url",
+                "item_id",
+            ]
 
         try:
             # Load the index from storage and insert new documents,
@@ -179,22 +199,48 @@ class IngestService:
                 if node.ref_doc_id is not None:
                     ingested_docs_ids.add(node.ref_doc_id)
 
-            for doc_id in ingested_docs_ids:
-                ref_doc_info = docstore.get_ref_doc_info(ref_doc_id=doc_id)
-                doc_metadata = None
-                if ref_doc_info is not None and ref_doc_info.metadata is not None:
-                    doc_metadata = IngestedDoc.curate_metadata(ref_doc_info.metadata)
-                ingested_docs.append(
-                    IngestedDoc(
-                        object="ingest.document",
-                        doc_id=doc_id,
-                        doc_metadata=doc_metadata,
-                    )
-                )
+            ingested_docs = self._get_ingest_docs_from_doc_ids(doc_ids=ingested_docs_ids)
         except ValueError:
             logger.warning("Got an exception when getting list of docs", exc_info=True)
             pass
         logger.debug("Found count=%s ingested documents", len(ingested_docs))
+        return ingested_docs
+
+    def list_ingested_user(self, user_id: str) -> list[IngestedDoc]:
+        ingested_docs = []
+        try:
+            docstore = self.storage_context.docstore
+            ingested_docs_ids: set[str] = set()
+
+            for node in docstore.docs.values():
+                if (
+                    node.metadata.get("user_id", None) is not None
+                    and node.metadata.get("user_id") == user_id
+                ):
+                    ingested_docs_ids.add(node.ref_doc_id)
+            ingested_docs = self._get_ingest_docs_from_doc_ids(doc_ids=ingested_docs_ids)
+
+        except ValueError:
+            logger.warning("Got an exception when getting list of docs", exc_info=True)
+            pass
+        logger.debug("Found count=%s ingested documents", len(ingested_docs))
+        return ingested_docs
+
+    def _get_ingest_docs_from_doc_ids(self, doc_ids: set[str]) -> list[IngestedDoc]:
+        ingested_docs = []
+        docstore = self.storage_context.docstore
+        for doc_id in doc_ids:
+            ref_doc_info = docstore.get_ref_doc_info(ref_doc_id=doc_id)
+            doc_metadata = None
+            if ref_doc_info is not None and ref_doc_info.metadata is not None:
+                doc_metadata = IngestedDoc.curate_metadata(ref_doc_info.metadata)
+            ingested_docs.append(
+                IngestedDoc(
+                    object="ingest.document",
+                    doc_id=doc_id,
+                    doc_metadata=doc_metadata,
+                )
+            )
         return ingested_docs
 
     def delete(self, doc_id: str) -> None:
@@ -219,3 +265,41 @@ class IngestService:
 
         # Save the index
         self.storage_context.persist(persist_dir=local_data_path)
+
+    def list_ingested_user_item_id(self, user_id: str, item_id: str) -> list[IngestedDoc]:
+        ingested_docs = []
+        try:
+            docstore = self.storage_context.docstore
+            ingested_docs_ids: set[str] = set()
+
+            for node in docstore.docs.values():
+                if (
+                    node.metadata.get("user_id", None) is not None
+                    and node.metadata.get("item_id", None) is not None
+                    and node.metadata.get("user_id") == user_id
+                    and node.metadata.get("item_id") == item_id
+                ):
+                    ingested_docs_ids.add(node.ref_doc_id)
+
+            ingested_docs = self._get_ingest_docs_from_doc_ids(doc_ids=ingested_docs_ids)
+        except ValueError:
+            logger.warning("Got an exception when getting list of docs", exc_info=True)
+            pass
+        logger.debug("Found count=%s ingested documents", len(ingested_docs))
+        return ingested_docs
+
+    def delete_item(self, item_id: str, user_id: str) -> None:
+        """Delete an ingested document.
+
+        :raises ValueError: if the document does not exist
+        """
+        logger.info(
+            "Deleting the ingested document for user_id=%s and item_id=%s in the doc and index store",
+            user_id,
+            item_id,
+        )
+
+        docs = self.list_ingested_user_item_id(user_id, item_id)
+
+        for doc in docs:
+            self.delete(doc_id=doc.doc_id)

@@ -3,3 +3,5 @@ server:
     enabled: ${JWT_AUTH_ENABLED:false}
     jwks_url: ${JWK_URL:https://example.com/.well-known/jwk}
     ingest_claim: ${JWT_INGEST_CLAIM:ingest}
+    user_id_claim: ${JWT_USER_ID_CLAIM:sub}
+    audience: ${JWT_AUDIENCE:https://example.com/}

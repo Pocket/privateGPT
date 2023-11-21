@@ -47,7 +47,7 @@ transformers = "^4.34.0"
 optional = true
 [tool.poetry.group.jwt.dependencies]
 pyjwt = "^2.8.0"
-crypto = "^1.4.1"
+cryptography = "^41.0.0"
 
 [tool.poetry.extras]
 chroma = ["chromadb"]

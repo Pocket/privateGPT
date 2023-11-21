@@ -74,6 +74,13 @@ class JWTAuthSettings(BaseModel):
         description="The JWT claim to use to determine if allowed to ingest",
         default="ingest",
     )
+    user_id_claim: str = Field(
+        description="The JWT claim to use to determine the user_id",
+        default="sub",
+    )
+    audience: str = Field(
+        description="The intended audience of the JWT", default="privateGPT"
+    )
 
 
 class ServerSettings(BaseModel):
@@ -110,6 +117,9 @@ class LLMSettings(BaseModel):
 
 class VectorstoreSettings(BaseModel):
     database: Literal["chroma", "qdrant"]
+    collection_name: str = Field(
+        description="collection name to use in the vector store", default="privateGPT"
+    )
 
 
 class LocalSettings(BaseModel):
