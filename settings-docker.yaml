@@ -15,5 +15,5 @@ sagemaker:
   embedding_endpoint_name: ${PGPT_SAGEMAKER_EMBEDDING_ENDPOINT_NAME:}
 
 ui:
-  enabled: true
+  enabled: ${UI_ENABLED:false}
   path: /

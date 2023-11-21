@@ -1,0 +1,170 @@
+version: 2.1
+
+orbs:
+  pocket: pocket/circleci-orbs@2.2.0
+
+# Workflow shortcuts
+# You can remove unnecessary shortcuts as applicable
+not_main: &not_main
+  filters:
+    branches:
+      ignore:
+        - main
+
+only_main: &only_main
+  filters:
+    branches:
+      only:
+        - main
+
+not_dev: &not_dev
+  filters:
+    branches:
+      ignore:
+        - dev
+
+only_dev_main: &only_dev_main
+  filters:
+    branches:
+      only:
+        - dev
+        - main
+
+not_dev_main: &not_dev_main
+  filters:
+    branches:
+      ignore:
+        - dev
+        - main
+
+only_dev: &only_dev
+  filters:
+    branches:
+      only:
+        - dev
+jobs:
+  build:
+    docker:
+      - image: cimg/python:3.12
+    steps:
+      - checkout
+      # Define the working directory for this job
+      - attach_workspace:
+          at: /tmp/workspace
+      # Add user to npmrc
+      # Copy built files to app_prod folder
+      - run:
+          name: Setup workspace
+          command: |
+            mkdir -p /tmp/workspace/app_prod
+            cp -r . /tmp/workspace/app_prod/
+            mv /tmp/workspace/app_prod/Dockerfile.local /tmp/workspace/app_prod/Dockerfile
+      # Persist built files to workspace
+      - persist_to_workspace:
+          root: /tmp/workspace
+          paths:
+            - app_prod
+
+workflows:
+  all:
+    jobs:
+
+      - build:
+          context: pocket
+
+      # Try building the ECS docker image on each branch
+      - pocket/docker_build:
+          <<: *not_dev_main
+          context: pocket
+          name: build_docker
+          aws-access-key-id: Dev_AWS_ACCESS_KEY
+          aws-secret-access-key: Dev_AWS_SECRET_ACCESS_KEY
+          aws-region: Dev_AWS_DEFAULT_REGION
+          repo-name: privategpt-dev-app
+          ecr-url: 410318598490.dkr.ecr.us-east-1.amazonaws.com
+          push: false
+          requires:
+            - build
+
+      # Build & Deploy the Dev Docker Image
+      - pocket/docker_build:
+          <<: *only_dev
+          context: pocket
+          name: build_docker_dev
+          aws-access-key-id: Dev_AWS_ACCESS_KEY
+          aws-secret-access-key: Dev_AWS_SECRET_ACCESS_KEY
+          aws-region: Dev_AWS_DEFAULT_REGION
+          codebuild-project-name: PrivateGPT-Dev
+          codebuild-project-branch: dev
+          repo-name: privategpt-dev-app
+          ecr-url: 410318598490.dkr.ecr.us-east-1.amazonaws.com
+          push: true
+          requires:
+            - build
+
+      # Dev
+      - pocket/execute_codepipeline:
+          <<: *only_dev
+          context: pocket
+          name: deploy_dev
+          environment: Dev
+          aws-access-key-id: Dev_AWS_ACCESS_KEY
+          aws-secret-access-key: Dev_AWS_SECRET_ACCESS_KEY
+          aws-region: Dev_AWS_DEFAULT_REGION
+          codepipeline-name: PrivateGPT-Dev-CodePipeline
+          codebuild-project-name: PrivateGPT-Dev
+          codebuild-project-branch: dev
+          requires:
+            - build_docker_dev
+
+      # Build & Deploy the Prod Docker Image
+      - pocket/docker_build:
+          <<: *only_main
+          context: pocket
+          name: build_docker_prod
+          aws-access-key-id: Prod_AWS_ACCESS_KEY
+          aws-secret-access-key: Prod_AWS_SECRET_ACCESS_KEY
+          aws-region: Prod_AWS_DEFAULT_REGION
+          codebuild-project-name: PrivateGPT-Prod
+          codebuild-project-branch: main
+          repo-name: privategpt-prod-app
+          ecr-url: 996905175585.dkr.ecr.us-east-1.amazonaws.com
+          push: true
+          requires:
+            - build
+
+      # Prod
+      - pocket/execute_codepipeline:
+          <<: *only_main
+          context: pocket
+          name: deploy_prod
+          environment: Prod
+          aws-access-key-id: Prod_AWS_ACCESS_KEY
+          aws-secret-access-key: Prod_AWS_SECRET_ACCESS_KEY
+          aws-region: Prod_AWS_DEFAULT_REGION
+          codepipeline-name: PrivateGPT-Prod-CodePipeline
+          codebuild-project-name: PrivateGPT-Prod
+          codebuild-project-branch: main
+          requires:
+            - build_docker_prod
+
+
+      # Prod
+      - pocket/setup_deploy_params:
+          <<: *only_main
+          name: setup-deploy-params-prod
+          aws_access_key_id: Prod_AWS_ACCESS_KEY
+          aws_secret_access_key: Prod_AWS_SECRET_ACCESS_KEY
+          context: pocket
+          env: Prod
+          service_name: ${SERVICE_NAME}
+
+      # Dev
+      - pocket/setup_deploy_params:
+          <<: *only_dev
+          name: setup-deploy-params-dev
+          aws_access_key_id: Dev_AWS_ACCESS_KEY
+          aws_secret_access_key: Dev_AWS_SECRET_ACCESS_KEY
+          context: pocket
+          env: Dev
+          service_name: ${SERVICE_NAME}
