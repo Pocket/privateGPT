@@ -47,6 +47,7 @@ def ingest(
     service = request.state.injector.get(IngestService)
     if file.filename is None:
         raise HTTPException(400, "No file name provided")
+    service.delete_item(user_id=user.sub, item_id=item_id)
     ingested_documents = service.ingest(
         file.filename, file.file.read(), user_id=user.sub, url=url, item_id=item_id
     )
@@ -69,7 +70,7 @@ def list_ingested(
         raise HTTPException(401, "Not authorized to list ingested content")
 
     service = request.state.injector.get(IngestService)
-    ingested_documents = service.list_ingested()
+    ingested_documents = service.list_ingested_user(user_id=user.sub)
     return IngestResponse(object="list", model="private-gpt", data=ingested_documents)
 
 
@@ -90,3 +91,18 @@ def delete_ingested(
         raise HTTPException(401, "Not authorized to delete ingested content")
     service = request.state.injector.get(IngestService)
     service.delete(doc_id)
+
+
+@ingest_router.delete(
+    "/ingest/item/{item_id}", tags=["Ingestion"], dependencies=[Depends(authenticated)]
+)
+def delete_ingested_item(
+    request: Request,
+    item_id: str,
+    user: Annotated[User, Depends(authenticated)],
+) -> None:
+    """Delete all documents related to the user and itemId."""
+    if not user.allowed_ingest:
+        raise HTTPException(401, "Not authorized to delete ingested content")
+    service = request.state.injector.get(IngestService)
+    service.delete_item(user_id=user.sub, item_id=item_id)
