@@ -65,6 +65,12 @@ phases:
   post_build:
     run-as: circleci
     commands:
+      - 'if [ "$GIT_BRANCH" = "$MAIN_BRANCH" ] || [ "$GIT_BRANCH" = "$DEV_BRANCH" ]; then cp appspec.json taskdef.json ../../../../; fi'
       # get back to the root dir
       - cd ../../
       - echo Build completed on `date`
+
+artifacts:
+  files:
+    - taskdef.json
+    - appspec.json
