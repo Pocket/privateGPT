@@ -47,7 +47,7 @@ def _simple_authentication(authorization: Annotated[str, Header()] = "") -> User
 
 
 def _jwt_authentication(authorization: Annotated[str, Header()] = "") -> User:
-    from jwt_auth import JWTAuth
+    from private_gpt.server.utils.jwt_auth import JWTAuth
 
     return global_injector.get(JWTAuth).validate_jwt(authorization)
 

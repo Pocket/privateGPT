@@ -26,7 +26,7 @@ class JWTAuth:
 
     def __init__(self):
         self.jwks_client = PyJWKClient(
-            settings().server.jwt_auth.jwksUrl, cache_jwk_set=True
+            settings().server.jwt_auth.jwks_url, cache_jwk_set=True
         )
 
     def validate_jwt(self, authorization: str) -> User | None:
