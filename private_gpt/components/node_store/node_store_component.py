@@ -6,6 +6,7 @@ from llama_index.storage.index_store import SimpleIndexStore
 from llama_index.storage.index_store.types import BaseIndexStore
 
 from private_gpt.paths import local_data_path
+from private_gpt.settings.settings import Settings
 
 logger = logging.getLogger(__name__)
 
@@ -16,19 +17,53 @@ class NodeStoreComponent:
     doc_store: BaseDocumentStore
 
     @inject
-    def __init__(self) -> None:
-        try:
-            self.index_store = SimpleIndexStore.from_persist_dir(
-                persist_dir=str(local_data_path)
-            )
-        except FileNotFoundError:
-            logger.debug("Local index store not found, creating a new one")
-            self.index_store = SimpleIndexStore()
+    def __init__(self, settings: Settings) -> None:
+        match settings.indexstore.database:
+            case "disk":
+                try:
+                    self.index_store = SimpleIndexStore.from_persist_dir(
+                        persist_dir=str(local_data_path)
+                    )
+                except FileNotFoundError:
+                    logger.debug("Local index store not found, creating a new one")
+                    self.index_store = SimpleIndexStore()
+            case "redis":
+                try:
+                    from llama_index.storage.index_store import RedisIndexStore
+                    from redis import Redis
+                except ImportError as e:
+                    raise ImportError(
+                        "'redis' is not installed."
+                        "To use PrivateGPT with Redis, install the 'redis' extra."
+                        "`poetry install --extras redis`"
+                    ) from e
+                try:
+                    self.index_store = RedisIndexStore.from_host_and_port(host=settings.indexstore.redis.host, port=settings.indexstore.redis.port, namespace=settings.indexstore.namespace)
+                except ValueError as e:
+                    logger.error(e)
+                    raise e
 
-        try:
-            self.doc_store = SimpleDocumentStore.from_persist_dir(
-                persist_dir=str(local_data_path)
-            )
-        except FileNotFoundError:
-            logger.debug("Local document store not found, creating a new one")
-            self.doc_store = SimpleDocumentStore()
+        match settings.documentstore.database:
+            case "disk":
+                try:
+                    self.doc_store = SimpleDocumentStore.from_persist_dir(
+                        persist_dir=str(local_data_path)
+                    )
+                except FileNotFoundError:
+                    logger.debug("Local document store not found, creating a new one")
+                    self.doc_store = SimpleDocumentStore()
+            case "redis":
+                try:
+                    from llama_index.storage.docstore import RedisDocumentStore
+                    from redis import Redis
+                except ImportError as e:
+                    raise ImportError(
+                        "'redis' is not installed."
+                        "To use PrivateGPT with Redis, install the 'redis' extra."
+                        "`poetry install --extras redis`"
+                    ) from e
+                try:
+                    self.doc_store = RedisDocumentStore.from_host_and_port(host=settings.documentstore.redis.host, port=settings.documentstore.redis.port, namespace=settings.documentstore.namespace)
+                except ValueError as e:
+                    logger.error(e)
+                    raise e
