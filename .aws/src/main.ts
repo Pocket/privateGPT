@@ -149,7 +149,8 @@ class PrivateGPT extends TerraformStack {
       qdrantUrl: `${appSecretsArn}:qdrant_url::`,
       qdrantUseHttps: `${appSecretsArn}:qdrant_use_https::`,
       qdrantCollection: `${appSecretsArn}:qdrant_collection::`,
-      jwtUserIdClaim: `${appSecretsArn}:jwt_user_id_claim::`
+      jwtUserIdClaim: `${appSecretsArn}:jwt_user_id_claim::`,
+      jwtAudience: `${appSecretsArn}:jwt_audience::`
     };
 
     return new PocketALBApplication(this, 'application', {
@@ -222,6 +223,10 @@ class PrivateGPT extends TerraformStack {
             {
               name: 'JWT_USER_ID_CLAIM',
               valueFrom: appSecretEnvVariables.jwtUserIdClaim,
+            },
+            {
+              name: 'JWT_AUDIENCE',
+              valueFrom: appSecretEnvVariables.jwtAudience,
             },
           ],
           logGroup: this.createCustomLogGroup('app'),
