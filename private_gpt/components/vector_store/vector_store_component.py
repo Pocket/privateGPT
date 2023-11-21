@@ -59,7 +59,7 @@ class VectorStoreComponent:
                     settings=chroma_settings,
                 )
                 chroma_collection = chroma_client.get_or_create_collection(
-                    "make_this_parameterizable_per_api_call"
+                    settings.vectorstore.collection_name
                 )  # TODO
 
                 self.vector_store = typing.cast(
@@ -87,8 +87,8 @@ class VectorStoreComponent:
                     VectorStore,
                     QdrantVectorStore(
                         client=client,
-                        collection_name="make_this_parameterizable_per_api_call",
-                    ),  # TODO
+                        collection_name=settings.vectorstore.collection_name,
+                    ),
                 )
             case _:
                 # Should be unreachable

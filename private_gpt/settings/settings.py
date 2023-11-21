@@ -110,6 +110,9 @@ class LLMSettings(BaseModel):
 
 class VectorstoreSettings(BaseModel):
     database: Literal["chroma", "qdrant"]
+    collection_name: str = Field(
+        description="collection name to use in the vector store", default="privateGPT"
+    )
 
 
 class LocalSettings(BaseModel):
