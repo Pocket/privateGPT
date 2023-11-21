@@ -26,6 +26,12 @@ llm:
 vectorstore:
   database: qdrant
 
+indexstore:
+  database: disk
+
+documentstore:
+  database: disk
+
 qdrant:
   path: local_data/private_gpt/qdrant
 
