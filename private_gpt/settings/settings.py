@@ -121,6 +121,7 @@ class VectorstoreSettings(BaseModel):
         description="collection name to use in the vector store", default="privateGPT"
     )
 
+
 class RedisSettings(BaseModel):
     host: str = Field(description="Redis host", default="redis")
     port: int = Field(description="Redis port", default=6379)
@@ -132,14 +133,22 @@ class DocumentstoreSettings(BaseModel):
         description="Namespace to store the document store in",
         default="private_gpt_documents",
     )
-    redis: RedisSettings = Field(description="The redis connection settings", default_factory=lambda: RedisSettings(host="redis", port=6379)
+    redis: RedisSettings = Field(
+        description="The redis connection settings",
+        default_factory=lambda: RedisSettings(host="redis", port=6379),
+    )
+
 
 class IndexstoreSettings(BaseModel):
     database: Literal["disk", "redis"] = Field(default="disk")
     namespace: str = Field(
         description="Namespace to store the index store in", default="private_gpt_index"
     )
-    redis: RedisSettings = Field(description="The redis connection settings", default_factory=lambda: RedisSettings(host="redis", port=6379)
+    redis: RedisSettings = Field(
+        description="The redis connection settings",
+        default_factory=lambda: RedisSettings(host="redis", port=6379),
+    )
+
 
 class LocalSettings(BaseModel):
     llm_hf_repo_id: str

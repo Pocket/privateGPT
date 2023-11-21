@@ -1,3 +1,4 @@
+import importlib
 import logging
 
 from injector import inject, singleton
@@ -28,17 +29,20 @@ class NodeStoreComponent:
                     logger.debug("Local index store not found, creating a new one")
                     self.index_store = SimpleIndexStore()
             case "redis":
-                try:
-                    from llama_index.storage.index_store import RedisIndexStore
-                    from redis import Redis
-                except ImportError as e:
+                if importlib.util.find_spec("redis") is None:
                     raise ImportError(
                         "'redis' is not installed."
                         "To use PrivateGPT with Redis, install the 'redis' extra."
                         "`poetry install --extras redis`"
-                    ) from e
+                    )
+                from llama_index.storage.index_store import RedisIndexStore
+
                 try:
-                    self.index_store = RedisIndexStore.from_host_and_port(host=settings.indexstore.redis.host, port=settings.indexstore.redis.port, namespace=settings.indexstore.namespace)
+                    self.index_store = RedisIndexStore.from_host_and_port(
+                        host=settings.indexstore.redis.host,
+                        port=settings.indexstore.redis.port,
+                        namespace=settings.indexstore.namespace,
+                    )
                 except ValueError as e:
                     logger.error(e)
                     raise e
@@ -53,17 +57,20 @@ class NodeStoreComponent:
                     logger.debug("Local document store not found, creating a new one")
                     self.doc_store = SimpleDocumentStore()
             case "redis":
-                try:
-                    from llama_index.storage.docstore import RedisDocumentStore
-                    from redis import Redis
-                except ImportError as e:
+                if importlib.util.find_spec("redis") is None:
                     raise ImportError(
                         "'redis' is not installed."
                         "To use PrivateGPT with Redis, install the 'redis' extra."
                         "`poetry install --extras redis`"
-                    ) from e
+                    )
                 try:
-                    self.doc_store = RedisDocumentStore.from_host_and_port(host=settings.documentstore.redis.host, port=settings.documentstore.redis.port, namespace=settings.documentstore.namespace)
+                    from llama_index.storage.docstore import RedisDocumentStore
+
+                    self.doc_store = RedisDocumentStore.from_host_and_port(
+                        host=settings.documentstore.redis.host,
+                        port=settings.documentstore.redis.port,
+                        namespace=settings.documentstore.namespace,
+                    )
                 except ValueError as e:
                     logger.error(e)
                     raise e
