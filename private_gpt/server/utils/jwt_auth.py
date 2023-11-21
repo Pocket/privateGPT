@@ -40,7 +40,10 @@ class JWTAuth:
                 signing_key.key,
                 algorithms=["RS256"],
                 audience=settings().server.jwt_auth.audience,
-                options={"require": ["exp", "iss", settings().server.jwt_auth.user_id_claim], "verify_signature": True},
+                options={
+                    "require": ["exp", "iss", settings().server.jwt_auth.user_id_claim],
+                    "verify_signature": True,
+                },
             )
             return User(
                 sub=data[settings().server.jwt_auth.user_id_claim],

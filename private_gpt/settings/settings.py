@@ -78,7 +78,9 @@ class JWTAuthSettings(BaseModel):
         description="The JWT claim to use to determine the user_id",
         default="sub",
     )
-    audience: str = Field(description="The intended audience of the JWT", default="privateGPT")
+    audience: str = Field(
+        description="The intended audience of the JWT", default="privateGPT"
+    )
 
 
 class ServerSettings(BaseModel):
