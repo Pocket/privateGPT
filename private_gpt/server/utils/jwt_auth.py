@@ -1,3 +1,5 @@
+import logging
+
 import jwt
 from fastapi import HTTPException
 from jwt import PyJWKClient
@@ -37,7 +39,7 @@ class JWTAuth:
                 token,
                 signing_key.key,
                 algorithms=["RS256"],
-                audience="https://expenses-api",
+                audience=settings().server.jwt_auth.audience,
                 options={"require": ["exp", "iss", settings().server.jwt_auth.user_id_claim], "verify_signature": True},
             )
             return User(
@@ -46,5 +48,6 @@ class JWTAuth:
                     data.get(settings().server.jwt_auth.ingest_claim, False)
                 ),
             )
-        except Exception:
+        except Exception as e:
+            logging.error(e)
             return None

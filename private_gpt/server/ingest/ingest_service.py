@@ -81,7 +81,14 @@ class IngestService:
             node_parser=SentenceWindowNodeParser.from_defaults(),
         )
 
-    def ingest(self, file_name: str, file_data: AnyStr | Path) -> list[IngestedDoc]:
+    def ingest(
+        self,
+        file_name: str,
+        file_data: AnyStr | Path,
+        user_id: AnyStr | None,
+        url: AnyStr | None,
+        item_id: AnyStr | None,
+    ) -> list[IngestedDoc]:
         logger.info("Ingesting file_name=%s", file_name)
         extension = Path(file_name).suffix
         reader_cls = FILE_READER_CLS.get(extension)
@@ -127,16 +134,29 @@ class IngestService:
             "Transformed file=%s into count=%s documents", file_name, len(documents)
         )
         for document in documents:
-            document.metadata["file_name"] = file_name
+            # document.metadata["file_name"] = file_name
+            if user_id is not None:
+                document.metadata["user_id"] = user_id
+            if url is not None:
+                document.metadata["url"] = url
+            if item_id is not None:
+                document.metadata["item_id"] = item_id
         return self._save_docs(documents)
 
     def _save_docs(self, documents: list[Document]) -> list[IngestedDoc]:
         for document in documents:
             document.metadata["doc_id"] = document.doc_id
             # We don't want the Embeddings search to receive this metadata
-            document.excluded_embed_metadata_keys = ["doc_id"]
+            document.excluded_embed_metadata_keys = ["doc_id", "item_id"]
             # We don't want the LLM to receive these metadata in the context
-            document.excluded_llm_metadata_keys = ["file_name", "doc_id", "page_label"]
+            document.excluded_llm_metadata_keys = [
+                "file_name",
+                "doc_id",
+                "page_label",
+                "user_id",
+                "url",
+                "item_id",
+            ]
 
         try:
             # Load the index from storage and insert new documents,
