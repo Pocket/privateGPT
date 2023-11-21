@@ -29,6 +29,10 @@ RUN poetry install --with jwt
 
 FROM base as app
 
+RUN apt update && apt install -y \
+ curl \
+ && rm -rf /var/lib/apt/lists/*
+
 ENV PYTHONUNBUFFERED=1
 ENV PORT=8080
 EXPOSE 8080
