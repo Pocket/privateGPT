@@ -289,8 +289,9 @@ class PrivateGPT extends TerraformStack {
           'arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy',
       },
       autoscalingConfig: {
-        targetMinCapacity: config.environment === 'Prod' ? 2 : 1,
-        targetMaxCapacity: config.environment === 'Prod' ? 10 : 10,
+        // While we are beta, setting to 1 instance in prod
+        targetMinCapacity: 1, //config.environment === 'Prod' ? 2 : 1,
+        targetMaxCapacity: 10, //config.environment === 'Prod' ? 10 : 10,
       },
       alarms: {
         // http5xxErrorPercentage: {
