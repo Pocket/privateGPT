@@ -1,6 +1,6 @@
-from typing import Literal, Annotated
+from typing import Annotated, Literal
 
-from fastapi import APIRouter, Depends, HTTPException, Request, UploadFile, File, Form
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile
 from pydantic import BaseModel
 
 from private_gpt.server.ingest.ingest_service import IngestedDoc, IngestService
@@ -24,7 +24,7 @@ def ingest(
     file: Annotated[UploadFile, File],
     url: Annotated[str, Form()],
     item_id: Annotated[str, Form()],
-    user: User = Depends(authenticated),
+    user: Annotated[User, Depends(authenticated)],
 ) -> IngestResponse:
     """Ingests and processes a file, storing its chunks to be used as context.
 
@@ -57,7 +57,8 @@ def ingest(
     "/ingest/list", tags=["Ingestion"], dependencies=[Depends(authenticated)]
 )
 def list_ingested(
-    request: Request, user: User = Depends(authenticated)
+    request: Request,
+    user: Annotated[User, Depends(authenticated)],
 ) -> IngestResponse:
     """Lists already ingested Documents including their Document ID and metadata.
 
@@ -76,7 +77,9 @@ def list_ingested(
     "/ingest/{doc_id}", tags=["Ingestion"], dependencies=[Depends(authenticated)]
 )
 def delete_ingested(
-    request: Request, doc_id: str, user: User = Depends(authenticated)
+    request: Request,
+    doc_id: str,
+    user: Annotated[User, Depends(authenticated)],
 ) -> None:
     """Delete the specified ingested Document.
 
