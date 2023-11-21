@@ -74,6 +74,10 @@ class JWTAuthSettings(BaseModel):
         description="The JWT claim to use to determine if allowed to ingest",
         default="ingest",
     )
+    user_id_claim: str = Field(
+        description="The JWT claim to use to determine the user_id",
+        default="sub",
+    )
 
 
 class ServerSettings(BaseModel):

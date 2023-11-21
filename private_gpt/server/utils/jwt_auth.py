@@ -38,10 +38,10 @@ class JWTAuth:
                 signing_key.key,
                 algorithms=["RS256"],
                 audience="https://expenses-api",
-                options={"require": ["exp", "iss", "sub"], "verify_signature": True},
+                options={"require": ["exp", "iss", settings().server.jwt_auth.user_id_claim], "verify_signature": True},
             )
             return User(
-                sub=data["sub"],
+                sub=data[settings().server.jwt_auth.user_id_claim],
                 allowed_ingest=bool(
                     data.get(settings().server.jwt_auth.ingest_claim, False)
                 ),
