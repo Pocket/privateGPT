@@ -146,6 +146,9 @@ class PrivateGPT extends TerraformStack {
     // Set the app secret arns as one secret in secrets manager
     let appSecretEnvVariables = {
       jwkUrl: `${appSecretsArn}:jwk_url::`,
+      qdrantUrl: `${appSecretsArn}:qdrant_url::`,
+      qdrantUseHttps: `${appSecretsArn}:qdrant_use_https::`,
+      qdrantCollection: `${appSecretsArn}:qdrant_collection::`,
     };
 
     return new PocketALBApplication(this, 'application', {
@@ -185,7 +188,7 @@ class PrivateGPT extends TerraformStack {
             },
             {
               name: 'PGPT_PROFILES',
-              value: 'docker,local,jwt',
+              value: 'docker,local,jwt,qdrant',
             },
             {
               name: 'JWT_AUTH_ENABLED',
@@ -199,6 +202,18 @@ class PrivateGPT extends TerraformStack {
             },
           ],
           secretEnvVars: [
+            {
+              name: 'JWK_URL',
+              valueFrom: appSecretEnvVariables.jwkUrl,
+            },
+            {
+              name: 'QDRANT_URL',
+              valueFrom: appSecretEnvVariables.qdrantUrl,
+            },
+            {
+              name: 'COLLECTION_NAME',
+              valueFrom: appSecretEnvVariables.qdrantCollection,
+            },
             {
               name: 'JWK_URL',
               valueFrom: appSecretEnvVariables.jwkUrl,
