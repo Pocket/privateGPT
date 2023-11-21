@@ -215,8 +215,8 @@ class PrivateGPT extends TerraformStack {
               valueFrom: appSecretEnvVariables.qdrantCollection,
             },
             {
-              name: 'JWK_URL',
-              valueFrom: appSecretEnvVariables.jwkUrl,
+              name: 'QDRANT_USE_HTTPS',
+              valueFrom: appSecretEnvVariables.qdrantUseHttps,
             },
           ],
           logGroup: this.createCustomLogGroup('app'),

@@ -35,6 +35,7 @@ EXPOSE 8080
 
 # Prepare a non-root user
 RUN adduser --system worker
+RUN addgroup --system worker
 WORKDIR /home/worker/app
 
 RUN mkdir local_data; chown worker local_data
