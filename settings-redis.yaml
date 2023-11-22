@@ -1,0 +1,13 @@
+documentstore:
+  database: redis
+  namespace: ${DOCUMENT_STORE_NAMESPACE:private_gpt_documents}
+  redis:
+    host: ${DOCUMENT_STORE_HOST:redis}
+    port: ${DOCUMENT_STORE_PORT:6379}
+
+indexstore:
+  database: redis
+  namespace: ${DOCUMENT_STORE_NAMESPACE:private_gpt_index}
+  redis:
+    host: ${INDEX_STORE_HOST:redis}
+    port: ${INDEX_STORE_PORT:6379}
