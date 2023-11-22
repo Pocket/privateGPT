@@ -127,8 +127,12 @@ class RedisSettings(BaseModel):
     port: int = Field(description="Redis port", default=6379)
 
 
+class DynamoDBSettings(BaseModel):
+    table_name: str = Field(description="Dynamodb Table name", default="dummy_table")
+
+
 class DocumentstoreSettings(BaseModel):
-    database: Literal["disk", "redis"] = Field(default="disk")
+    database: Literal["disk", "redis", "dynamodb"] = Field(default="disk")
     namespace: str = Field(
         description="Namespace to store the document store in",
         default="private_gpt_documents",
@@ -137,16 +141,24 @@ class DocumentstoreSettings(BaseModel):
         description="The redis connection settings",
         default_factory=lambda: RedisSettings(host="redis", port=6379),
     )
+    dynamodb: DynamoDBSettings = Field(
+        description="The dynamodb settings",
+        default_factory=lambda: DynamoDBSettings(table_name="dummy_table"),
+    )
 
 
 class IndexstoreSettings(BaseModel):
-    database: Literal["disk", "redis"] = Field(default="disk")
+    database: Literal["disk", "redis", "dynamodb"] = Field(default="disk")
     namespace: str = Field(
         description="Namespace to store the index store in", default="private_gpt_index"
     )
     redis: RedisSettings = Field(
         description="The redis connection settings",
         default_factory=lambda: RedisSettings(host="redis", port=6379),
+    )
+    dynamodb: DynamoDBSettings = Field(
+        description="The dynamodb settings",
+        default_factory=lambda: DynamoDBSettings(table_name="dummy_table"),
     )
 
 
