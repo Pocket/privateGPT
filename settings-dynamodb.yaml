@@ -1,0 +1,11 @@
+documentstore:
+  database: dynamodb
+  namespace: ${DOCUMENT_STORE_NAMESPACE:private_gpt_documents}
+  dynamodb:
+    table_name: ${DOCUMENT_STORE_TABLE_NAME:documentstore}
+
+indexstore:
+  database: dynamodb
+  namespace: ${DOCUMENT_STORE_NAMESPACE:private_gpt_index}
+  dynamodb:
+    table_name: ${INDEX_STORE_TABLE_NAME:indexstore}

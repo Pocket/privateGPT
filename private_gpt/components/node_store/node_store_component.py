@@ -1,5 +1,5 @@
-import importlib
 import logging
+from importlib import util
 
 from injector import inject, singleton
 from llama_index.storage.docstore import BaseDocumentStore, SimpleDocumentStore
@@ -29,7 +29,7 @@ class NodeStoreComponent:
                     logger.debug("Local index store not found, creating a new one")
                     self.index_store = SimpleIndexStore()
             case "redis":
-                if importlib.util.find_spec("redis") is None:
+                if util.find_spec("redis") is None:
                     raise ImportError(
                         "'redis' is not installed."
                         "To use PrivateGPT with Redis, install the 'redis' extra."
@@ -46,6 +46,19 @@ class NodeStoreComponent:
                 except ValueError as e:
                     logger.error(e)
                     raise e
+            case "dynamodb":
+                from llama_index.storage.index_store.dynamodb_index_store import (
+                    DynamoDBIndexStore,
+                )
+
+                try:
+                    self.index_store = DynamoDBIndexStore.from_table_name(
+                        table_name=settings.indexstore.dynamodb.table_name,
+                        namespace=settings.indexstore.namespace,
+                    )
+                except ValueError as e:
+                    logger.error(e)
+                    raise e
 
         match settings.documentstore.database:
             case "disk":
@@ -57,7 +70,7 @@ class NodeStoreComponent:
                     logger.debug("Local document store not found, creating a new one")
                     self.doc_store = SimpleDocumentStore()
             case "redis":
-                if importlib.util.find_spec("redis") is None:
+                if util.find_spec("redis") is None:
                     raise ImportError(
                         "'redis' is not installed."
                         "To use PrivateGPT with Redis, install the 'redis' extra."
@@ -69,6 +82,19 @@ class NodeStoreComponent:
                     self.doc_store = RedisDocumentStore.from_host_and_port(
                         host=settings.documentstore.redis.host,
                         port=settings.documentstore.redis.port,
+                        namespace=settings.documentstore.namespace,
+                    )
+                except ValueError as e:
+                    logger.error(e)
+                    raise e
+            case "dynamodb":
+                from llama_index.storage.docstore.dynamodb_docstore import (
+                    DynamoDBDocumentStore,
+                )
+
+                try:
+                    self.doc_store = DynamoDBDocumentStore.from_table_name(
+                        table_name=settings.documentstore.dynamodb.table_name,
                         namespace=settings.documentstore.namespace,
                     )
                 except ValueError as e:

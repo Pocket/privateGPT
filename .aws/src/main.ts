@@ -22,6 +22,7 @@ import {
   TerraformStack,
 } from 'cdktf';
 import { config } from './config';
+import {DynamoDB} from "./dynamodb";
 
 class PrivateGPT extends TerraformStack {
   constructor(scope: Construct, name: string) {
@@ -42,6 +43,7 @@ class PrivateGPT extends TerraformStack {
     const pocketVPC = new PocketVPC(this, 'pocket-vpc');
     const region = new DataAwsRegion(this, 'region');
     const caller = new DataAwsCallerIdentity(this, 'caller');
+    const dynamodb = new DynamoDB(this, 'dynamodb');
     const pocketApp = this.createPocketAlbApplication({
       pagerDuty: undefined, // this.createPagerDuty(),
       secretsManagerKmsAlias: this.getSecretsManagerKmsAlias(),
@@ -49,6 +51,7 @@ class PrivateGPT extends TerraformStack {
       region,
       caller,
       vpc: pocketVPC,
+      dynamodb
     });
 
     this.createApplicationCodePipeline(pocketApp);
@@ -127,8 +130,9 @@ class PrivateGPT extends TerraformStack {
     secretsManagerKmsAlias: DataAwsKmsAlias;
     snsTopic: DataAwsSnsTopic;
     vpc: PocketVPC;
+    dynamodb: DynamoDB;
   }): PocketALBApplication {
-    const { pagerDuty, region, caller, secretsManagerKmsAlias, snsTopic, vpc } =
+    const { pagerDuty, region, caller, secretsManagerKmsAlias, snsTopic, vpc, dynamodb } =
       dependencies;
 
     const secretResources = [
@@ -190,7 +194,7 @@ class PrivateGPT extends TerraformStack {
             },
             {
               name: 'PGPT_PROFILES',
-              value: 'docker,local,jwt,qdrant',
+              value: 'docker,local,jwt,qdrant,dynamodb',
             },
             {
               name: 'JWT_AUTH_ENABLED',
@@ -201,6 +205,14 @@ class PrivateGPT extends TerraformStack {
               value:
                 process.env.CODEBUILD_RESOLVED_SOURCE_VERSION ??
                 process.env.CIRCLE_SHA1,
+            },
+            {
+              name: 'DOCUMENT_STORE_TABLE_NAME',
+              value: dynamodb.documentStoreTable.dynamodb.name
+            },
+            {
+              name: 'INDEX_STORE_TABLE_NAME',
+              value: dynamodb.indexStoreTable.dynamodb.name
             },
           ],
           secretEnvVars: [
@@ -283,7 +295,25 @@ class PrivateGPT extends TerraformStack {
             ],
             resources: ['*'],
             effect: 'Allow',
-          }
+          },
+            {
+            actions: [
+              'dynamodb:BatchGet*',
+              'dynamodb:DescribeTable',
+              'dynamodb:Get*',
+              'dynamodb:Query',
+              'dynamodb:Scan',
+              'dynamodb:UpdateItem',
+              'dynamodb:PutItem',
+            ],
+            resources: [
+              dynamodb.indexStoreTable.dynamodb.arn,
+              `${dynamodb.indexStoreTable.dynamodb.arn}/*`,
+              dynamodb.documentStoreTable.dynamodb.arn,
+              `${dynamodb.documentStoreTable.dynamodb.arn}/*`
+            ],
+            effect: 'Allow',
+          },
         ],
         taskExecutionDefaultAttachmentArn:
           'arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy',
