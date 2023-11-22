@@ -199,7 +199,9 @@ class IngestService:
                 if node.ref_doc_id is not None:
                     ingested_docs_ids.add(node.ref_doc_id)
 
-            ingested_docs = self._get_ingest_docs_from_doc_ids(doc_ids=ingested_docs_ids)
+            ingested_docs = self._get_ingest_docs_from_doc_ids(
+                doc_ids=ingested_docs_ids
+            )
         except ValueError:
             logger.warning("Got an exception when getting list of docs", exc_info=True)
             pass
@@ -218,7 +220,9 @@ class IngestService:
                     and node.metadata.get("user_id") == user_id
                 ):
                     ingested_docs_ids.add(node.ref_doc_id)
-            ingested_docs = self._get_ingest_docs_from_doc_ids(doc_ids=ingested_docs_ids)
+            ingested_docs = self._get_ingest_docs_from_doc_ids(
+                doc_ids=ingested_docs_ids
+            )
 
         except ValueError:
             logger.warning("Got an exception when getting list of docs", exc_info=True)
@@ -266,7 +270,9 @@ class IngestService:
         # Save the index
         self.storage_context.persist(persist_dir=local_data_path)
 
-    def list_ingested_user_item_id(self, user_id: str, item_id: str) -> list[IngestedDoc]:
+    def list_ingested_user_item_id(
+        self, user_id: str, item_id: str
+    ) -> list[IngestedDoc]:
         ingested_docs = []
         try:
             docstore = self.storage_context.docstore
@@ -281,7 +287,9 @@ class IngestService:
                 ):
                     ingested_docs_ids.add(node.ref_doc_id)
 
-            ingested_docs = self._get_ingest_docs_from_doc_ids(doc_ids=ingested_docs_ids)
+            ingested_docs = self._get_ingest_docs_from_doc_ids(
+                doc_ids=ingested_docs_ids
+            )
         except ValueError:
             logger.warning("Got an exception when getting list of docs", exc_info=True)
             pass
