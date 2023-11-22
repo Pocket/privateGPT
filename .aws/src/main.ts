@@ -23,6 +23,7 @@ import {
 } from 'cdktf';
 import { config } from './config';
 import {DynamoDB} from "./dynamodb";
+import {Sagemaker} from "./sagemaker";
 
 class PrivateGPT extends TerraformStack {
   constructor(scope: Construct, name: string) {
@@ -44,6 +45,8 @@ class PrivateGPT extends TerraformStack {
     const region = new DataAwsRegion(this, 'region');
     const caller = new DataAwsCallerIdentity(this, 'caller');
     const dynamodb = new DynamoDB(this, 'dynamodb');
+    const sagemaker = new Sagemaker(this, 'sagemaker', pocketVPC);
+
     const pocketApp = this.createPocketAlbApplication({
       pagerDuty: undefined, // this.createPagerDuty(),
       secretsManagerKmsAlias: this.getSecretsManagerKmsAlias(),
@@ -51,7 +54,8 @@ class PrivateGPT extends TerraformStack {
       region,
       caller,
       vpc: pocketVPC,
-      dynamodb
+      dynamodb,
+      sagemaker
     });
 
     this.createApplicationCodePipeline(pocketApp);
@@ -131,8 +135,9 @@ class PrivateGPT extends TerraformStack {
     snsTopic: DataAwsSnsTopic;
     vpc: PocketVPC;
     dynamodb: DynamoDB;
+    sagemaker: Sagemaker;
   }): PocketALBApplication {
-    const { pagerDuty, region, caller, secretsManagerKmsAlias, snsTopic, vpc, dynamodb } =
+    const { pagerDuty, region, caller, secretsManagerKmsAlias, snsTopic, vpc, dynamodb, sagemaker } =
       dependencies;
 
     const secretResources = [
@@ -194,7 +199,7 @@ class PrivateGPT extends TerraformStack {
             },
             {
               name: 'PGPT_PROFILES',
-              value: 'docker,local,jwt,qdrant,dynamodb',
+              value: 'docker,sagemaker,jwt,qdrant,dynamodb',
             },
             {
               name: 'JWT_AUTH_ENABLED',
@@ -213,6 +218,14 @@ class PrivateGPT extends TerraformStack {
             {
               name: 'INDEX_STORE_TABLE_NAME',
               value: dynamodb.indexStoreTable.dynamodb.name
+            },
+            {
+              name: 'SAGEMAKER_LLM_ENDPOINT_NAME',
+              value: sagemaker.llmEndpoint.endpoint.name
+            },
+            {
+              name: 'SAGEMAKER_EMBEDDING_ENDPOINT_NAME',
+              value: sagemaker.embeddingsEndpoint.endpoint.name
             },
           ],
           secretEnvVars: [
