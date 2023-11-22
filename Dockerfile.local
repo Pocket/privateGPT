@@ -22,10 +22,15 @@ ENV POETRY_VIRTUALENVS_IN_PROJECT=true
 FROM base as dependencies
 WORKDIR /home/worker/app
 COPY pyproject.toml poetry.lock ./
+COPY  private_gpt/ private_gpt
+COPY  scripts scripts
+COPY *.yaml ./
 
 RUN poetry install --with local
 RUN poetry install --with ui
 RUN poetry install --with jwt
+
+RUN poetry run scripts/setup && rm -rf scripts private_gpt *.yaml
 
 FROM base as app
 
@@ -43,11 +48,13 @@ RUN addgroup --system worker
 WORKDIR /home/worker/app
 
 RUN mkdir local_data; chown worker local_data
-RUN mkdir models; chown worker models
 COPY --chown=worker --from=dependencies /home/worker/app/.venv/ .venv
+COPY --chown=worker --from=dependencies /home/worker/app/models/ models
 COPY --chown=worker private_gpt/ private_gpt
 COPY --chown=worker docs/ docs
 COPY --chown=worker *.yaml *.md ./
-
 USER worker
+
+
+
 ENTRYPOINT .venv/bin/python -m private_gpt
