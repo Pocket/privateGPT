@@ -4,7 +4,7 @@ import typing
 from injector import inject, singleton
 from llama_index import VectorStoreIndex
 from llama_index.indices.vector_store import VectorIndexRetriever
-from llama_index.vector_stores.types import VectorStore
+from llama_index.vector_stores.types import MetadataFilters, VectorStore
 
 from private_gpt.components.vector_store.batched_chroma import BatchedChromaVectorStore
 from private_gpt.open_ai.extensions.context_filter import ContextFilter
@@ -31,17 +31,6 @@ def _chromadb_doc_id_metadata_filter(
         else:
             doc_filter = {"doc_id": context_filter.docs_ids[0]}
         return doc_filter
-
-
-@typing.no_type_check
-def _chromadb_user_id_metadata_filter(
-    context_filter: ContextFilter | None,
-) -> dict | None:
-    if context_filter is None or context_filter.user_id is None:
-        raise Exception("Need a user id")
-    else:
-        user_filter = {"user_id": context_filter.user_id}
-    return user_filter
 
 
 @singleton
@@ -114,14 +103,24 @@ class VectorStoreComponent:
         context_filter: ContextFilter | None = None,
         similarity_top_k: int = 2,
     ) -> VectorIndexRetriever:
-        # This way we support qdrant (using doc_ids) and chroma (using where clause)
+
+        filters: MetadataFilters | None = None
+
+        if context_filter is not None and context_filter.user_id is not None:
+            filters = MetadataFilters.from_dict(
+                filter_dict={"user_id": context_filter.user_id}
+            )
+
         return VectorIndexRetriever(
             index=index,
             similarity_top_k=similarity_top_k,
             doc_ids=context_filter.docs_ids if context_filter else None,
+            filters=filters,
             vector_store_kwargs={
-                "where": _chromadb_user_id_metadata_filter(context_filter)
-            },
+                "where": _chromadb_doc_id_metadata_filter(context_filter)
+            }
+            if context_filter.doc_ids
+            else None,
         )
 
     def close(self) -> None:
