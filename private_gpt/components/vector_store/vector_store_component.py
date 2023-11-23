@@ -114,13 +114,7 @@ class VectorStoreComponent:
         return VectorIndexRetriever(
             index=index,
             similarity_top_k=similarity_top_k,
-            doc_ids=context_filter.docs_ids if context_filter else None,
-            filters=filters,
-            vector_store_kwargs={
-                "where": _chromadb_doc_id_metadata_filter(context_filter)
-            }
-            if context_filter.doc_ids
-            else None,
+            filters=filters
         )
 
     def close(self) -> None:
