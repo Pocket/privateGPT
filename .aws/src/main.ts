@@ -327,6 +327,16 @@ class PrivateGPT extends TerraformStack {
             ],
             effect: 'Allow',
           },
+          {
+            actions: [
+              'sagemaker:InvokeEndpoint',
+            ],
+            resources: [
+              sagemaker.embeddingsEndpoint.endpoint.arn,
+              sagemaker.llmEndpoint.endpoint.arn,
+            ],
+            effect: 'Allow',
+          },
         ],
         taskExecutionDefaultAttachmentArn:
           'arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy',
