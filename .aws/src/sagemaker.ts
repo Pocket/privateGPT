@@ -5,13 +5,12 @@ import {SagemakerEndpoint} from "@cdktf/provider-aws/lib/sagemaker-endpoint";
 import {SagemakerModel} from "@cdktf/provider-aws/lib/sagemaker-model";
 import {DataAwsIamPolicyDocument} from "@cdktf/provider-aws/lib/data-aws-iam-policy-document";
 import {IamRole} from "@cdktf/provider-aws/lib/iam-role";
-import {ApplicationECR, PocketVPC} from "@pocket-tools/terraform-modules";
+import {PocketVPC} from "@pocket-tools/terraform-modules";
 import {S3Bucket} from "@cdktf/provider-aws/lib/s3-bucket";
 import {IamRolePolicy} from "@cdktf/provider-aws/lib/iam-role-policy";
 import {Resource} from "@cdktf/provider-null/lib/resource";
 import {S3Object} from "@cdktf/provider-aws/lib/s3-object";
-import {Fn, ITerraformDependable, Token} from "cdktf";
-import {DataLocalFile} from "@cdktf/provider-local/lib/data-local-file";
+import {Fn, ITerraformDependable} from "cdktf";
 
 export class Sagemaker extends Construct {
   public readonly llmEndpoint: ApplicationSagemaker;
@@ -28,20 +27,19 @@ export class Sagemaker extends Construct {
             instanceType: 'ml.g5.2xlarge',
             instanceCount: 1,
             vpc,
+            // Note we use a text-generation specific image here that has a newer version of transformers installed,
+            // which supports more types of text-generation images. The standard hugging face image, used below, only supports Llama
+            // This image only supports text generation. https://github.com/aws/deep-learning-containers/releases?q=tgi&expanded=true
+            // https://huggingface.co/blog/sagemaker-huggingface-llm#what-is-hugging-face-llm-inference-dlc
+            image: `763104351884.dkr.ecr.us-east-1.amazonaws.com/huggingface-pytorch-tgi-inference:2.0.1-tgi1.1.0-gpu-py39-cu118-ubuntu20.04`,
             modelName: 'llm',
             environment: {
                 "SAGEMAKER_CONTAINER_LOG_LEVEL": "20",
                 "SAGEMAKER_REGION": vpc.region,
                 'SM_NUM_GPUS': '1', // Number of GPU used per replica
-
-                // The sagemaker setup in the llm code expects a specific format, which is what the text-generation pipeline enables.
-                // You can look at the model on HuggingFace to determine what the HF_TASK needs to be set to.
-                // If not set, the image will try and determine it from the Architecture set in Config.json of your model
-                // https://github.com/aws/sagemaker-huggingface-inference-toolkit/blob/main/src/sagemaker_huggingface_inference_toolkit/transformers_utils.py#L80-L92
-                'HF_TASK': 'text-generation'
+                'HF_MODEL_ID': 'mistralai/Mistral-7B-Instruct-v0.1', // The model id to pull and use.
             },
            modelStorage: this.modelStorage,
-           model: this.uploadLLMModel(this.modelStorage)
         });
 
        this.embeddingsEndpoint = new ApplicationSagemaker(this, `embeddings`, {
@@ -49,6 +47,7 @@ export class Sagemaker extends Construct {
             instanceType: 'ml.g4dn.xlarge',
             instanceCount: 1,
             vpc,
+            image: `763104351884.dkr.ecr.us-east-1.amazonaws.com/huggingface-pytorch-inference:2.0.0-transformers4.28.1-gpu-py310-cu118-ubuntu20.04`,
             modelName: 'embeddings',
             environment: {
                 "SAGEMAKER_CONTAINER_LOG_LEVEL": "20",
@@ -62,7 +61,7 @@ export class Sagemaker extends Construct {
    }
 
    private uploadEmbeddingModel(modelStorage: S3Bucket): S3Object {
-        const buildModel = new Resource(this, 'build-embedding', {
+        const uploadModelFile = new Resource(this, 'build-embedding', {
           triggers: {
               // Sets this null resource to be triggered on every terraform apply
               alwaysRun: Fn.timestamp(),
@@ -71,7 +70,6 @@ export class Sagemaker extends Construct {
             modelStorage,
           ],
         });
-
 
         const inferenceCode = `
 from transformers import AutoTokenizer, AutoModel
@@ -126,82 +124,24 @@ def predict_fn(data, model_and_tokenizer):
 
         const modelScript = `
 pip install -U "huggingface_hub[cli]"
-rm -rf ./embedding-model
 huggingface-cli download BAAI/bge-small-en-v1.5 --local-dir=./embedding-model --local-dir-use-symlinks=False
 mkdir ./embedding-model/code
 echo "${inferenceCode}" > ./embedding-model/code/inference.py
-tar -C embedding-model -zcvf embedding-model.tar.gz .
+tar -C embedding-model -zcvf embeddings-model.tar.gz .
 `
 
-        buildModel.addOverride(
+        uploadModelFile.addOverride(
           'provisioner.local-exec.command',
           modelScript,
         );
 
-        return new S3Object(this, 'embedding_model_object', {
+        return new S3Object(this, 'model_object', {
             bucket: modelStorage.bucket,
             key: `embeddings/model-${Fn.uuid()}.tar.gz`,
-            source: './embedding-model.tar.gz',
-            dependsOn: [buildModel]
+            source: './embeddings-model.tar.gz',
+            dependsOn: [uploadModelFile]
         });
    }
-
-   private uploadLLMModel(modelStorage: S3Bucket): S3Object {
-        const buildModel = new Resource(this, 'build-llm', {
-          triggers: {
-              // Sets this null resource to be triggered on every terraform apply
-              alwaysRun: Fn.timestamp(),
-          },
-          dependsOn: [
-            modelStorage,
-          ],
-        });
-
-        const inferenceCode = `
-from transformers import AutoTokenizer, AutoModel
-import pip
-
-##
-# The hugging face no code deployment of Sagemaker Inference at
-# https://github.com/aws/sagemaker-huggingface-inference-toolkit
-# Does not support the latest version of the mistral images,
-# So for mistral models we push our own to AWS and add this hook script that is supported at
-# https://github.com/aws/sagemaker-huggingface-inference-toolkit#-user-defined-codemodules
-# This lets us install the latest version of transformers that should support this.
-# Example: https://github.com/huggingface/notebooks/blob/main/sagemaker/17_custom_inference_script/sagemaker-notebook.ipynb
-##
-
-def model_fn(model_dir):
-    # Current version of the inference image does not have the latest transformers needed to support Mistral based images
-    pip.main(['install', 'transformers[sentencepiece,audio,vision]==4.35.2'])
-    # Load model from HuggingFace Hub
-    tokenizer = AutoTokenizer.from_pretrained(model_dir)
-    model = AutoModel.from_pretrained(model_dir)
-    return model, tokenizer
-`
-
-        const modelScript = `
-pip install -U "huggingface_hub[cli]"
-rm -rf ./llm-model
-huggingface-cli download mistralai/Mistral-7B-v0.1 --local-dir=./llm-model --local-dir-use-symlinks=False
-mkdir ./llm-model/code
-echo "${inferenceCode}" > ./llm-model/code/inference.py
-tar -C llm-model -zcvf llm-model.tar.gz .
-`
-
-        buildModel.addOverride(
-          'provisioner.local-exec.command',
-          modelScript,
-        );
-
-        return new S3Object(this, 'llm_model_object', {
-            bucket: modelStorage.bucket,
-            key: `llm/model-${Fn.uuid()}.tar.gz`,
-            source: './llm-model.tar.gz',
-            dependsOn: [buildModel]
-        });
-   }
-
    private createModelStorage(): S3Bucket {
       return new S3Bucket(this, `model_storage`, {
           bucketPrefix: `${config.prefix}-ModelStorage`.toLowerCase(),
@@ -216,17 +156,17 @@ class ApplicationSagemaker extends Construct {
     public readonly model: SagemakerModel
     public readonly endpoint: SagemakerEndpoint
 
-  constructor(scope: Construct, name: string, options: {vpc: PocketVPC, modelName: string, instanceType: string, instanceCount: number, environment: {[key: string]: string;}, modelStorage: S3Bucket, model?: S3Object }) {
+  constructor(scope: Construct, name: string, options: {vpc: PocketVPC, modelName: string, image: string, instanceType: string, instanceCount: number, environment: {[key: string]: string;}, modelStorage: S3Bucket, model?: S3Object }) {
     super(scope, name);
-    const {  vpc, modelName, instanceType, instanceCount, environment, modelStorage, model } = options;
-    this.model = this.createModel({vpc, modelName, environment, modelStorage, model })
+    const {  vpc, modelName, image, instanceType, instanceCount, environment, modelStorage, model } = options;
+    this.model = this.createModel({vpc, image, modelName, environment, modelStorage, model })
     this.configuration = this.createConfiguration({model: this.model, modelName, instanceType, instanceCount})
     this.endpoint = this.createEndpoint({configuration: this.configuration, modelName})
   }
 
 
-  private createModel(options: { vpc: PocketVPC, modelName: string, environment: {[key: string]: string;}, modelStorage: S3Bucket, model?: S3Object}): SagemakerModel {
-        const {vpc, modelName, environment, modelStorage, model } = options;
+  private createModel(options: { vpc: PocketVPC, image: string, modelName: string, environment: {[key: string]: string;}, modelStorage: S3Bucket, model?: S3Object}): SagemakerModel {
+        const {vpc, image,  modelName, environment, modelStorage, model } = options;
         const role = new IamRole(this, `model_role`, {
             name: `${config.prefix}-${modelName}-ExecutionRole`,
             assumeRolePolicy: new DataAwsIamPolicyDocument(this, `model_assume_role_policy`, {
@@ -272,9 +212,7 @@ class ApplicationSagemaker extends Construct {
             name: `${config.prefix}-${modelName}`,
             primaryContainer: {
                 modelDataUrl : model != undefined ? `s3://${model.bucket}/${model.key}` : undefined,
-                // https://github.com/aws/deep-learning-containers/blob/master/available_images.md#huggingface-text-generation-inference-containers
-                // https://huggingface.co/blog/sagemaker-huggingface-llm
-                image: '763104351884.dkr.ecr.us-east-1.amazonaws.com/huggingface-pytorch-inference:2.0.0-transformers4.28.1-gpu-py310-cu118-ubuntu20.04',
+                image,
                 mode: "SingleModel",
                 environment
             },
@@ -299,7 +237,7 @@ class ApplicationSagemaker extends Construct {
                 // Because we are currently using HuggingFace which downloads the model on startup (and needs a startup healthcheck)
                 // and because we use a VPC config we can not use Serverless.
                 // In the future when we build our own image, we could probably use serverless.
-                containerStartupHealthCheckTimeoutInSeconds: 500,
+                containerStartupHealthCheckTimeoutInSeconds: 600,
                 initialInstanceCount: instanceCount,
                 instanceType: instanceType,
             }],
