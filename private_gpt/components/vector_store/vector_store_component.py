@@ -112,9 +112,7 @@ class VectorStoreComponent:
             )
 
         return VectorIndexRetriever(
-            index=index,
-            similarity_top_k=similarity_top_k,
-            filters=filters
+            index=index, similarity_top_k=similarity_top_k, filters=filters
         )
 
     def close(self) -> None:

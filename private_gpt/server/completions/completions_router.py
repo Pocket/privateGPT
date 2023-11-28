@@ -1,3 +1,5 @@
+from typing import Annotated
+
 from fastapi import APIRouter, Depends, Request
 from pydantic import BaseModel
 from starlette.responses import StreamingResponse
@@ -9,14 +11,13 @@ from private_gpt.open_ai.openai_models import (
 )
 from private_gpt.server.chat.chat_router import ChatBody, chat_completion
 from private_gpt.server.utils.auth import authenticated
+from private_gpt.server.utils.user import User
 
 completions_router = APIRouter(prefix="/v1", dependencies=[Depends(authenticated)])
 
 
 class CompletionsBody(BaseModel):
     prompt: str
-    use_context: bool = False
-    context_filter: ContextFilter | None = None
     include_sources: bool = True
     stream: bool = False
 
@@ -26,7 +27,6 @@ class CompletionsBody(BaseModel):
                 {
                     "prompt": "How do you fry an egg?",
                     "stream": False,
-                    "use_context": False,
                     "include_sources": False,
                 }
             ]
@@ -40,9 +40,12 @@ class CompletionsBody(BaseModel):
     summary="Completion",
     responses={200: {"model": OpenAICompletion}},
     tags=["Contextual Completions"],
+    dependencies=[Depends(authenticated)],
 )
 def prompt_completion(
-    request: Request, body: CompletionsBody
+    request: Request,
+    body: CompletionsBody,
+    user: Annotated[User, Depends(authenticated)],
 ) -> OpenAICompletion | StreamingResponse:
     """We recommend most users use our Chat completions API.
 
@@ -67,9 +70,9 @@ def prompt_completion(
     message = OpenAIMessage(content=body.prompt, role="user")
     chat_body = ChatBody(
         messages=[message],
-        use_context=body.use_context,
+        use_context=True,
         stream=body.stream,
         include_sources=body.include_sources,
-        context_filter=body.context_filter,
+        context_filter=ContextFilter(user_id=user.sub),
     )
     return chat_completion(request, chat_body)
