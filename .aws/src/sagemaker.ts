@@ -30,14 +30,25 @@ export class Sagemaker extends Construct {
             // Note we use a text-generation specific image here that has a newer version of transformers installed,
             // which supports more types of text-generation images. The standard hugging face image, used below, only supports Llama
             // This image only supports text generation. https://github.com/aws/deep-learning-containers/releases?q=tgi&expanded=true
-            // https://huggingface.co/blog/sagemaker-huggingface-llm#what-is-hugging-face-llm-inference-dlc
+            // https://huggingface.co/docs/text-generation-inference/supported_models
+            // https://github.com/huggingface/text-generation-inference/blob/main/Dockerfile
             image: `763104351884.dkr.ecr.us-east-1.amazonaws.com/huggingface-pytorch-tgi-inference:2.0.1-tgi1.1.0-gpu-py39-cu118-ubuntu20.04`,
             modelName: 'llm',
             environment: {
                 "SAGEMAKER_CONTAINER_LOG_LEVEL": "20",
                 "SAGEMAKER_REGION": vpc.region,
                 'SM_NUM_GPUS': '1', // Number of GPU used per replica
-                'HF_MODEL_ID': 'mistralai/Mistral-7B-Instruct-v0.1', // The model id to pull and use.
+                // https://huggingface.co/mistralai/Mistral-7B-Instruct-v0.1
+                // The model id to pull and use.
+                // Note different models have different
+                'HF_MODEL_ID': 'mistralai/Mistral-7B-Instruct-v0.1',
+                'HF_TASK':'text-generation',
+                // Var names from: https://huggingface.co/amazon/MistralLite#deploy-the-model-as-a-sagemaker-endpoint
+                // Actual values from https://aws.amazon.com/blogs/machine-learning/mistral-7b-foundation-models-from-mistral-ai-are-now-available-in-amazon-sagemaker-jumpstart/
+                "MAX_INPUT_LENGTH": '8191',
+                "MAX_TOTAL_TOKENS": '8384',
+                "MAX_BATCH_PREFILL_TOKENS": '8384',
+                "MAX_BATCH_TOTAL_TOKENS":  '8384',
             },
            modelStorage: this.modelStorage,
         });

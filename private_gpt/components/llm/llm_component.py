@@ -37,6 +37,10 @@ class LLMComponent:
 
                 self.llm = SagemakerLLM(
                     endpoint_name=settings.sagemaker.llm_endpoint_name,
+                    # From https://huggingface.co/amazon/MistralLite#deploy-the-model-as-a-sagemaker-endpoint
+                    # TODO: pull these from settings
+                    max_new_tokens=400,
+                    context_window=3900
                 )
             case "openai":
                 from llama_index.llms import OpenAI
