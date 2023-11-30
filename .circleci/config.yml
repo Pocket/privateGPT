@@ -58,7 +58,7 @@ jobs:
           command: |
             mkdir -p /tmp/workspace/app_prod
             cp -r . /tmp/workspace/app_prod/
-            mv /tmp/workspace/app_prod/Dockerfile.local /tmp/workspace/app_prod/Dockerfile
+            mv /tmp/workspace/app_prod/Dockerfile.external /tmp/workspace/app_prod/Dockerfile
       # Persist built files to workspace
       - persist_to_workspace:
           root: /tmp/workspace

@@ -1,3 +1,5 @@
+from typing import Annotated
+
 from fastapi import APIRouter, Depends, Request
 from llama_index.llms import ChatMessage, MessageRole
 from pydantic import BaseModel
@@ -12,14 +14,13 @@ from private_gpt.open_ai.openai_models import (
 )
 from private_gpt.server.chat.chat_service import ChatService
 from private_gpt.server.utils.auth import authenticated
+from private_gpt.server.utils.user import User
 
 chat_router = APIRouter(prefix="/v1", dependencies=[Depends(authenticated)])
 
 
 class ChatBody(BaseModel):
     messages: list[OpenAIMessage]
-    use_context: bool = False
-    context_filter: ContextFilter | None = None
     include_sources: bool = True
     stream: bool = False
 
@@ -34,9 +35,7 @@ class ChatBody(BaseModel):
                         }
                     ],
                     "stream": False,
-                    "use_context": True,
                     "include_sources": True,
-                    "context_filter": {"user_id": "12"},
                 }
             ]
         }
@@ -48,9 +47,10 @@ class ChatBody(BaseModel):
     response_model=None,
     responses={200: {"model": OpenAICompletion}},
     tags=["Contextual Completions"],
+    dependencies=[Depends(authenticated)],
 )
 def chat_completion(
-    request: Request, body: ChatBody
+    request: Request, body: ChatBody, user: Annotated[User, Depends(authenticated)]
 ) -> OpenAICompletion | StreamingResponse:
     """Given a list of messages comprising a conversation, return a response.
 
@@ -77,7 +77,7 @@ def chat_completion(
     ]
     if body.stream:
         completion_gen = service.stream_chat(
-            all_messages, body.use_context, body.context_filter
+            all_messages, True, ContextFilter(user_id=user.sub)
         )
         return StreamingResponse(
             to_openai_sse_stream(
@@ -87,7 +87,7 @@ def chat_completion(
             media_type="text/event-stream",
         )
     else:
-        completion = service.chat(all_messages, body.use_context, body.context_filter)
+        completion = service.chat(all_messages, True, ContextFilter(user_id=user.sub))
         return to_openai_response(
             completion.response, completion.sources if body.include_sources else None
         )
