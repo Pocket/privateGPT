@@ -75,4 +75,4 @@ def prompt_completion(
         include_sources=body.include_sources,
         context_filter=ContextFilter(user_id=user.sub),
     )
-    return chat_completion(request, chat_body)
+    return chat_completion(request, chat_body, user)
